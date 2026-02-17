@@ -1,4 +1,4 @@
-## Assignment 2 - Tip Calulator 
+## Assignment 2 - Tip Calculator 
 
 ### Serhii Kuzmin
 
@@ -11,11 +11,11 @@
 #### Edge Cases Considered 
 
 - Subtotal and tip percentage can never be negative
-- At least 1 person be participating in the computation
+- At least 1 person must be participating in the computation
 - If no data is entered, no output is displayed
-- The button is inactive if the input field are empty or contain invalid data
+- The button is inactive if the input fields are empty or contain invalid data
 
 #### Potential Flaws
 
-- Some UI quirks (not investigated)
+- Some UI quirks (not fully investigated)
 - Other minor edge cases that should not affect the user experience

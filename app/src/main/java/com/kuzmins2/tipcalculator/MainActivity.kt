@@ -88,6 +88,7 @@ fun MyTipCalculator(modifier: Modifier = Modifier) {
             modifier = Modifier.fillMaxWidth(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             value = subTotalInput,
+            prefix = {Text("$")},
             label = { Text("Subtotal amount") },
             onValueChange = {inputStr ->
                 subTotalInput = inputStr
@@ -161,7 +162,7 @@ fun MyTipCalculator(modifier: Modifier = Modifier) {
         //Output
         if(isEnabled) {
             Text( //total cost
-                text = "Total cost: $totalCost",
+                text = $$"Total cost:  $$$totalCost",
                 color = Color.Red,
                 fontSize = 30.sp,
                 fontStyle = FontStyle.Italic,
@@ -174,7 +175,7 @@ fun MyTipCalculator(modifier: Modifier = Modifier) {
 
             Text( //amount per person
 
-                text = "Amount per person: $amountPerPerson",
+                text = $$"Amount per person:  $$$amountPerPerson",
                 color = Color.Red,
                 fontSize = 25.sp,
                 fontStyle = FontStyle.Italic,
@@ -185,6 +186,7 @@ fun MyTipCalculator(modifier: Modifier = Modifier) {
                     .padding(24.dp)
             )
         }
+
 
     }
 
