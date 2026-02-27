@@ -21,6 +21,7 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ElevatedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.RadioButtonColors
 import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -31,6 +32,7 @@ import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -39,10 +41,12 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kuzmins2.tipcalculator.ui.theme.TipCalculatorTheme
 import kotlin.math.ceil
+import kotlin.text.toDouble
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -62,11 +66,21 @@ class MainActivity : ComponentActivity() {
 
 @SuppressLint("DefaultLocale")
 @Composable
+// This is the main skeleton function of the entire app.
+// It is more than 40 lines of code because the way I have the program
+// set up is I have multiple states to track all the input and output.
+// Additionally, the input validation is the huge part of the reason the
+// function is so large. Most of the components are in their dedicated
+// functions.
 fun MyTipCalculator(modifier: Modifier = Modifier) {
 
-    var subTotalInput by remember { mutableStateOf("") }
-    var tipPercentageInput by remember { mutableStateOf("15") }
-    var numPeopleInput by remember { mutableStateOf("") }
+    // For the TextFields, I decided to have two separate states
+    // to track and validate the input. While it violates the single source of truth
+    // principle, it helps to prevent invalid input
+
+    var subTotalInput by rememberSaveable { mutableStateOf("") }
+    var tipPercentageInput by rememberSaveable { mutableStateOf("15") }
+    var numPeopleInput by rememberSaveable { mutableStateOf("") }
 
     var subTotalValue by remember { mutableDoubleStateOf(0.0) }
     var tipPercentageValue by remember { mutableDoubleStateOf(15.0) }
@@ -75,7 +89,7 @@ fun MyTipCalculator(modifier: Modifier = Modifier) {
     var totalCost by remember { mutableDoubleStateOf(0.0)}
     var amountPerPerson by remember { mutableDoubleStateOf(0.0)}
 
-    var checkedState by remember { mutableStateOf(false) }
+    var checkedState by rememberSaveable { mutableStateOf(false) }
 
     val isSubTotalValid by remember {
         derivedStateOf { (subTotalInput.toDoubleOrNull() ?: 0.0) > 0.0 }
@@ -92,60 +106,151 @@ fun MyTipCalculator(modifier: Modifier = Modifier) {
     }
 
     val radioOptions = listOf(15, 20, 25)
-    var selectedOption: Int? by remember { mutableStateOf(radioOptions[0]) }
+    var selectedOption: Int? by rememberSaveable { mutableStateOf(radioOptions[0]) }
     val myColors = RadioButtonDefaults.colors(selectedColor = Color.Black, unselectedColor =
         Color.Blue)
 
-    Column(modifier = modifier.fillMaxSize().padding(24.dp)) {
+    Column(modifier = modifier
+        .fillMaxSize()
+        .padding(24.dp)) {
 
-        //Input
-        OutlinedTextField( //subtotal amount
-            modifier = Modifier.fillMaxWidth(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            value = subTotalInput,
-            prefix = {Text("$")},
-            placeholder = {Text("20.00")},
-            label = { Text("Subtotal amount") },
-            onValueChange = {inputStr ->
-                subTotalInput = inputStr
-                val parsedValue = inputStr.toDoubleOrNull()
-                if(parsedValue != null && parsedValue > 0 ) {
-                    subTotalValue = parsedValue
+        Subtotal(subTotalInput, isSubTotalValid,
+                onValueChanged = {inputStr ->
+                    subTotalInput = inputStr
+                    val parsedValue = inputStr.toDoubleOrNull()
+                    if(parsedValue != null && parsedValue > 0 ) {
+                        subTotalValue = parsedValue
+                    }
+                })
+
+        //Tip Percentage
+        TipPercentage(tipPercentageInput,
+                onValueChanged = { inputStr ->
+                    tipPercentageInput = inputStr
+
+                    val parsedValue = inputStr.toDoubleOrNull()
+
+                    if (parsedValue != null && parsedValue > 0) {
+                        tipPercentageValue = parsedValue
+
+                        selectedOption = radioOptions.firstOrNull {
+                            it.toDouble() == parsedValue
+                        }
+                    } else {
+                        tipPercentageValue = 15.0
+                        selectedOption = 0
+                    }
+                },
+                isTipValid,
+                radioOptions,
+                selectedOption,
+                myColors,
+                onClicked = {value -> selectedOption = value
+                    tipPercentageValue = value.toDouble()
+                    tipPercentageInput = value.toString() },
+            )
+
+        NumberOfPeople( numPeopleInput, isNumPeopleValid,
+            onValueChanged = {inputStr ->
+            numPeopleInput = inputStr
+            val parsedValue = inputStr.toIntOrNull()
+            if(parsedValue != null && parsedValue > 0 ) {
+                numPeopleValue = parsedValue
+            }
+
+        },)
+
+        Buttons(
+            onCalculateClicked = {
+                Log.d("BUTTON", "calculated")
+                totalCost = subTotalValue + subTotalValue * (tipPercentageValue / 100)
+                amountPerPerson = String.format("%.2f", (totalCost / numPeopleValue)).toDouble()
+            },
+            onResetClicked = {
+                Log.d("BUTTON", "reset")
+                subTotalInput = ""
+                tipPercentageInput = "15.0"
+                numPeopleInput = ""
+                subTotalValue = 0.0
+                tipPercentageValue = 15.0
+                numPeopleValue = 0
+                totalCost = 0.0
+                amountPerPerson = 0.0
+                selectedOption = radioOptions[0]
+                checkedState = false
+            },
+            isEnabled)
+
+        Costs(
+            totalCost = totalCost,
+            amountPerPerson = amountPerPerson,
+            checkedState = checkedState,
+            isEnabled = isEnabled,
+            modifier = modifier,
+            onCheckedChanged = { isChecked ->
+
+                checkedState = isChecked
+
+                if (isChecked) {
+                    amountPerPerson = ceil(amountPerPerson)
+                    totalCost = amountPerPerson * numPeopleValue
+                } else {
+                    totalCost = subTotalValue +
+                            subTotalValue * (tipPercentageValue / 100)
+
+                    amountPerPerson =
+                        String.format("%.2f",
+                            (totalCost / numPeopleValue)
+                        ).toDouble()
                 }
-
-            },
-            isError = !isSubTotalValid && subTotalInput.isNotEmpty(),
-            supportingText = {
-                if(!isSubTotalValid && subTotalInput.isNotEmpty()) {Text(text="Number must be positive")}
-            },
-            singleLine = true
+            }
         )
 
-        OutlinedTextField( //tip percentage
+    }
+
+}
+
+@Composable
+fun Subtotal(subTotalInput: String,
+             isSubTotalValid: Boolean,
+             onValueChanged: (String) -> Unit) {
+    //Input
+    OutlinedTextField( //subtotal amount
+        modifier = Modifier.fillMaxWidth(),
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+        value = subTotalInput,
+        prefix = {Text("$")},
+        placeholder = {Text("20.00")},
+        label = { Text("Subtotal amount") },
+        onValueChange = onValueChanged,
+        isError = !isSubTotalValid && subTotalInput.isNotEmpty(),
+        supportingText = {
+            if(!isSubTotalValid && subTotalInput.isNotEmpty()) {Text(text="Number must be positive")}
+        },
+        singleLine = true
+    )
+}
+
+@Composable
+fun TipPercentage(tipPercentageInput: String,
+                  onValueChanged: (String) -> Unit,
+                  isTipValid: Boolean,
+                  radioOptions: List<Int>,
+                  selectedOption: Int?,
+                  myColors: RadioButtonColors,
+                  onClicked: (Int) -> Unit
+                  ) {
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+
+        OutlinedTextField( //tip percentage input
             modifier = Modifier.fillMaxWidth(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             value = tipPercentageInput,
             suffix = {Text("%")},
             placeholder = {Text("15")},
             label = { Text("Tip percentage") },
-
-            onValueChange = { inputStr ->
-                tipPercentageInput = inputStr
-
-                val parsedValue = inputStr.toDoubleOrNull()
-
-                if (parsedValue != null && parsedValue > 0) {
-                    tipPercentageValue = parsedValue
-
-                    selectedOption = radioOptions.firstOrNull {
-                        it.toDouble() == parsedValue
-                    }
-                } else {
-                    tipPercentageValue = 15.0
-                    selectedOption = 0
-                }
-            },
-
+            onValueChange = onValueChanged,
             isError = !isTipValid && tipPercentageInput.isNotEmpty(),
             supportingText = {
                 if(!isTipValid && tipPercentageInput.isNotEmpty()) {Text(text="Number must be positive")}
@@ -170,145 +275,126 @@ fun MyTipCalculator(modifier: Modifier = Modifier) {
                     RadioButton(
                         selected = (value == selectedOption),
                         colors = myColors,
-                        onClick = {
-                            selectedOption = value
-                            tipPercentageValue = value.toDouble()
-                            tipPercentageInput = value.toString()
-                        }
+                        onClick = {onClicked(value)}
                     )
                     Text(text = value.toString())
                 }
             }
         }
 
-        OutlinedTextField( //num of people
-            modifier = Modifier.fillMaxWidth(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            value = numPeopleInput,
-            label = {Text("Number of people")},
-            placeholder = {Text("0")},
-            onValueChange = {inputStr ->
-                numPeopleInput = inputStr
-                val parsedValue = inputStr.toIntOrNull()
-                if(parsedValue != null && parsedValue > 0 ) {
-                    numPeopleValue = parsedValue
-                }
+    }
+}
 
-            },
-            isError = !isNumPeopleValid && numPeopleInput.isNotEmpty(),
-            supportingText = {
-                if(!isNumPeopleValid && numPeopleInput.isNotEmpty()) {Text(text="Number must be at least 1")}
-            },
-            singleLine = true
-        )
+@Composable
+fun NumberOfPeople(numPeopleInput: String,
+                   isNumPeopleValid: Boolean,
+                   onValueChanged: (String) -> Unit) {
+    OutlinedTextField( //num of people
+        modifier = Modifier.fillMaxWidth(),
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+        value = numPeopleInput,
+        label = {Text("Number of people")},
+        placeholder = {Text("0")},
+        onValueChange = onValueChanged,
+        isError = !isNumPeopleValid && numPeopleInput.isNotEmpty(),
+        supportingText = {
+            if(!isNumPeopleValid && numPeopleInput.isNotEmpty()) {Text(text="Number must be at least 1")}
+        },
+        singleLine = true
+    )
+}
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp) // space between buttons
+@Composable
+fun Buttons(onCalculateClicked: () -> Unit,
+            onResetClicked: () -> Unit,
+            isEnabled: Boolean) {
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp) // space between buttons
+    ) {
+        ElevatedButton(
+            onClick = onCalculateClicked,
+            enabled = isEnabled,
+            shape = CircleShape,
+            modifier = Modifier.weight(1f), // takes half the row
+            contentPadding = PaddingValues(24.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = Color.LightGray,
+                contentColor = Color.Blue
+            )
         ) {
-            ElevatedButton(
-                onClick = {
-                    Log.d("BUTTON", "calculated")
-                    totalCost = subTotalValue + subTotalValue * (tipPercentageValue / 100)
-                    amountPerPerson = String.format("%.2f", (totalCost / numPeopleValue)).toDouble()
-                },
-                enabled = isEnabled,
-                shape = CircleShape,
-                modifier = Modifier.weight(1f), // takes half the row
-                contentPadding = PaddingValues(24.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color.LightGray,
-                    contentColor = Color.Blue
-                )
-            ) {
-                Text("Calculate", fontSize = 24.sp)
-            }
-
-            ElevatedButton(
-                onClick = {
-                    Log.d("BUTTON", "reset")
-                    subTotalInput = ""
-                    tipPercentageInput = "15.0"
-                    numPeopleInput = ""
-                    subTotalValue = 0.0
-                    tipPercentageValue = 15.0
-                    numPeopleValue = 0
-                    totalCost = 0.0
-                    amountPerPerson = 0.0
-                    selectedOption = radioOptions[0]
-                    checkedState = false
-                },
-                enabled = isEnabled,
-                shape = CircleShape,
-                modifier = Modifier.weight(1f), // takes half the row
-                contentPadding = PaddingValues(24.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color.LightGray,
-                    contentColor = Color.Blue
-                )
-            ) {
-                Text("Reset", fontSize = 24.sp)
-            }
+            Text("Calculate", fontSize = 24.sp)
         }
 
-        //Output
-        if(isEnabled) {
-            Column(
-                modifier = modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = "Total cost: $${totalCost}",
-                    color = Color.Blue,
-                    fontSize = 26.sp, // increased font size
-                    fontStyle = FontStyle.Italic,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(bottom = 4.dp) // smaller space below
-                )
-
-
-                Text(
-                    text = "Amount per person: $${amountPerPerson}",
-                    color = Color.Blue,
-                    fontSize = 26.sp, // increased font size
-                    fontStyle = FontStyle.Italic,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(top = 0.dp) // optional, minimal padding
-                )
-
-                Row(modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-
-                    Text(
-                        text = "Round up? ",
-                        fontSize = 20.sp, // increased font size
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center,
-                    )
-
-                    Checkbox(
-                        checked = checkedState,
-                        onCheckedChange = {
-                            if (!checkedState) {
-                                amountPerPerson = ceil(amountPerPerson)
-                                totalCost = amountPerPerson * numPeopleValue
-                            } else {
-                                totalCost = subTotalValue + subTotalValue * (tipPercentageValue / 100)
-                                amountPerPerson = String.format("%.2f", (totalCost / numPeopleValue)).toDouble()
-                            }
-
-                            checkedState = !checkedState
-                        }
-                    )
-                }
-            }
-
-
+        ElevatedButton(
+            onClick = onResetClicked,
+            enabled = isEnabled,
+            shape = CircleShape,
+            modifier = Modifier.weight(1f), // takes half the row
+            contentPadding = PaddingValues(24.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = Color.LightGray,
+                contentColor = Color.Blue
+            )
+        ) {
+            Text("Reset", fontSize = 24.sp)
         }
     }
+}
 
+@Composable
+fun Costs(totalCost: Double,
+          amountPerPerson: Double,
+          checkedState: Boolean,
+          onCheckedChanged: (Boolean) -> Unit,
+          isEnabled: Boolean,
+          modifier: Modifier) {
+
+    if(isEnabled) {
+        Column(
+            modifier = modifier.fillMaxWidth(), //might change to modifier.fillMaxWidth
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "Total cost: $${totalCost}",
+                color = Color.Blue,
+                fontSize = 26.sp, // increased font size
+                fontStyle = FontStyle.Italic,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(bottom = 4.dp) // smaller space below
+            )
+
+
+            Text(
+                text = "Amount per person: $${amountPerPerson}",
+                color = Color.Blue,
+                fontSize = 26.sp, // increased font size
+                fontStyle = FontStyle.Italic,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(top = 0.dp) // optional, minimal padding
+            )
+
+            Row(modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+
+                Text(
+                    text = "Round up? ",
+                    fontSize = 20.sp, // increased font size
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                )
+
+                Checkbox(
+                    checked = checkedState,
+                    onCheckedChange = onCheckedChanged
+                )
+            }
+        }
+
+    }
 }
