@@ -74,91 +74,92 @@ class MainActivity : ComponentActivity() {
 // functions.
 fun MyTipCalculator(modifier: Modifier = Modifier) {
 
-    // For the TextFields, I decided to have two separate states
-    // to track and validate the input. While it violates the single source of truth
-    // principle, it helps to prevent invalid input
-
     var subTotalInput by rememberSaveable { mutableStateOf("") }
     var tipPercentageInput by rememberSaveable { mutableStateOf("15") }
     var numPeopleInput by rememberSaveable { mutableStateOf("") }
 
-    var subTotalValue by remember { mutableDoubleStateOf(0.0) }
-    var tipPercentageValue by remember { mutableDoubleStateOf(15.0) }
-    var numPeopleValue by remember { mutableIntStateOf(0) }
+    var subTotalValue by rememberSaveable { mutableDoubleStateOf(0.0) }
+    var tipPercentageValue by rememberSaveable { mutableDoubleStateOf(15.0) }
+    var numPeopleValue by rememberSaveable { mutableIntStateOf(0) }
 
-    var totalCost by remember { mutableDoubleStateOf(0.0)}
-    var amountPerPerson by remember { mutableDoubleStateOf(0.0)}
+    var totalCost by rememberSaveable { mutableDoubleStateOf(0.0) }
+    var amountPerPerson by rememberSaveable { mutableDoubleStateOf(0.0) }
 
     var checkedState by rememberSaveable { mutableStateOf(false) }
 
-    val isSubTotalValid by remember {
+    val isSubTotalValid by remember(subTotalInput) {
         derivedStateOf { (subTotalInput.toDoubleOrNull() ?: 0.0) > 0.0 }
     }
-    val isTipValid by remember {
+    val isTipValid by remember(tipPercentageInput) {
         derivedStateOf { (tipPercentageInput.toDoubleOrNull() ?: 0.0) > 0.0 }
     }
-    val isNumPeopleValid by remember {
+    val isNumPeopleValid by remember(numPeopleInput) {
         derivedStateOf { (numPeopleInput.toIntOrNull() ?: 0) >= 1 }
     }
-
-    val isEnabled by remember {
+    val isEnabled by remember(isSubTotalValid, isTipValid, isNumPeopleValid) {
         derivedStateOf { isSubTotalValid && isTipValid && isNumPeopleValid }
     }
 
     val radioOptions = listOf(15, 20, 25)
     var selectedOption: Int? by rememberSaveable { mutableStateOf(radioOptions[0]) }
-    val myColors = RadioButtonDefaults.colors(selectedColor = Color.Black, unselectedColor =
-        Color.Blue)
+    val myColors = RadioButtonDefaults.colors(
+        selectedColor = Color.Black,
+        unselectedColor = Color.Blue
+    )
 
-    Column(modifier = modifier
-        .fillMaxSize()
-        .padding(24.dp)) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(24.dp)
+    ) {
 
-        Subtotal(subTotalInput, isSubTotalValid,
-                onValueChanged = {inputStr ->
-                    subTotalInput = inputStr
-                    val parsedValue = inputStr.toDoubleOrNull()
-                    if(parsedValue != null && parsedValue > 0 ) {
-                        subTotalValue = parsedValue
-                    }
-                })
-
-        //Tip Percentage
-        TipPercentage(tipPercentageInput,
-                onValueChanged = { inputStr ->
-                    tipPercentageInput = inputStr
-
-                    val parsedValue = inputStr.toDoubleOrNull()
-
-                    if (parsedValue != null && parsedValue > 0) {
-                        tipPercentageValue = parsedValue
-
-                        selectedOption = radioOptions.firstOrNull {
-                            it.toDouble() == parsedValue
-                        }
-                    } else {
-                        tipPercentageValue = 15.0
-                        selectedOption = 0
-                    }
-                },
-                isTipValid,
-                radioOptions,
-                selectedOption,
-                myColors,
-                onClicked = {value -> selectedOption = value
-                    tipPercentageValue = value.toDouble()
-                    tipPercentageInput = value.toString() },
-            )
-
-        NumberOfPeople( numPeopleInput, isNumPeopleValid,
-            onValueChanged = {inputStr ->
-            numPeopleInput = inputStr
-            val parsedValue = inputStr.toIntOrNull()
-            if(parsedValue != null && parsedValue > 0 ) {
-                numPeopleValue = parsedValue
+        Subtotal(
+            subTotalInput, isSubTotalValid,
+            onValueChanged = { inputStr ->
+                subTotalInput = inputStr
+                val parsedValue = inputStr.toDoubleOrNull()
+                if (parsedValue != null && parsedValue > 0) {
+                    subTotalValue = parsedValue
+                }
             }
+        )
 
-        },)
+        TipPercentage(
+            tipPercentageInput,
+            onValueChanged = { inputStr ->
+                tipPercentageInput = inputStr
+                val parsedValue = inputStr.toDoubleOrNull()
+                if (parsedValue != null && parsedValue > 0) {
+                    tipPercentageValue = parsedValue
+                    selectedOption = radioOptions.firstOrNull {
+                        it.toDouble() == parsedValue
+                    }
+                } else {
+                    tipPercentageValue = 15.0
+                    selectedOption = 0
+                }
+            },
+            isTipValid,
+            radioOptions,
+            selectedOption,
+            myColors,
+            onClicked = { value ->
+                selectedOption = value
+                tipPercentageValue = value.toDouble()
+                tipPercentageInput = value.toString()
+            },
+        )
+
+        NumberOfPeople(
+            numPeopleInput, isNumPeopleValid,
+            onValueChanged = { inputStr ->
+                numPeopleInput = inputStr
+                val parsedValue = inputStr.toIntOrNull()
+                if (parsedValue != null && parsedValue > 0) {
+                    numPeopleValue = parsedValue
+                }
+            }
+        )
 
         Buttons(
             onCalculateClicked = {
@@ -179,7 +180,8 @@ fun MyTipCalculator(modifier: Modifier = Modifier) {
                 selectedOption = radioOptions[0]
                 checkedState = false
             },
-            isEnabled)
+            isEnabled
+        )
 
         Costs(
             totalCost = totalCost,
@@ -188,26 +190,17 @@ fun MyTipCalculator(modifier: Modifier = Modifier) {
             isEnabled = isEnabled,
             modifier = modifier,
             onCheckedChanged = { isChecked ->
-
                 checkedState = isChecked
-
                 if (isChecked) {
                     amountPerPerson = ceil(amountPerPerson)
                     totalCost = amountPerPerson * numPeopleValue
                 } else {
-                    totalCost = subTotalValue +
-                            subTotalValue * (tipPercentageValue / 100)
-
-                    amountPerPerson =
-                        String.format("%.2f",
-                            (totalCost / numPeopleValue)
-                        ).toDouble()
+                    totalCost = subTotalValue + subTotalValue * (tipPercentageValue / 100)
+                    amountPerPerson = String.format("%.2f", (totalCost / numPeopleValue)).toDouble()
                 }
             }
         )
-
     }
-
 }
 
 @Composable
@@ -395,6 +388,5 @@ fun Costs(totalCost: Double,
                 )
             }
         }
-
     }
 }
